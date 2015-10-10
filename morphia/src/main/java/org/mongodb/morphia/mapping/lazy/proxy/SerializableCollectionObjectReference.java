@@ -35,7 +35,7 @@ public class SerializableCollectionObjectReference<T> extends AbstractReference 
         super(p, referenceObjClass, ignoreMissing);
 
         object = type;
-        listOfKeys = new ArrayList<Key<?>>();
+        listOfKeys = new ArrayList<>();
     }
 
     @Override
@@ -80,7 +80,7 @@ public class SerializableCollectionObjectReference<T> extends AbstractReference 
         // (List) __getKeysAsList());
 
         // so we do it the lousy way: FIXME
-        final List<T> retrievedEntities = new ArrayList<T>(listOfKeys.size());
+        final List<T> retrievedEntities = new ArrayList<>(listOfKeys.size());
         final Datastore ds = p.get();
         for (final Key<?> k : listOfKeys) {
             retrievedEntities.add((T) ds.getByKey(referenceObjClass, k));

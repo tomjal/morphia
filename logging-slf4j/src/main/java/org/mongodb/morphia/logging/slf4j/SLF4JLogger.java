@@ -46,7 +46,9 @@ public class SLF4JLogger implements org.mongodb.morphia.logging.Logger {
 
     @Override
     public void debug(final String msg) {
-        this.logger.debug(msg);
+        if (logger.isDebugEnabled()) {
+            this.logger.debug(msg);
+        }
     }
 
     @Override

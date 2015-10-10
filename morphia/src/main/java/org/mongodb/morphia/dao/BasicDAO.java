@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import static java.util.stream.Collectors.toList;
+
 /**
  * @param <T> the type of the entity
  * @param <K> the type of the key
@@ -275,10 +277,10 @@ public class BasicDAO<T, K> implements DAO<T, K> {
      * Converts from a List<Key> to their id values
      */
     protected List<?> keysToIds(final List<Key<T>> keys) {
-        final List<Object> ids = new ArrayList<Object>(keys.size() * 2);
-        for (final Key<T> key : keys) {
-            ids.add(key.getId());
-        }
+        final List<Object> ids = new ArrayList<>(keys.size() * 2);
+        ids.addAll(keys.stream()
+                       .map(Key<T>::getId)
+                       .collect(toList()));
         return ids;
     }
 

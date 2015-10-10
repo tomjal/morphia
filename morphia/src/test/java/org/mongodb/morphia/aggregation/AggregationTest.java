@@ -22,6 +22,7 @@ import org.bson.types.ObjectId;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mongodb.morphia.TestBase;
+import org.mongodb.morphia.annotations.Converters;
 import org.mongodb.morphia.annotations.Entity;
 import org.mongodb.morphia.annotations.Id;
 import org.mongodb.morphia.geo.City;
@@ -29,8 +30,8 @@ import org.mongodb.morphia.geo.PlaceWithLegacyCoords;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -39,6 +40,7 @@ import static org.mongodb.morphia.aggregation.Group.push;
 import static org.mongodb.morphia.aggregation.Group.sum;
 import static org.mongodb.morphia.aggregation.Projection.divide;
 import static org.mongodb.morphia.aggregation.Projection.projection;
+import static org.mongodb.morphia.aggregation.Sort.ascending;
 import static org.mongodb.morphia.geo.GeoJson.point;
 
 public class AggregationTest extends TestBase {
@@ -52,7 +54,7 @@ public class AggregationTest extends TestBase {
 
         Iterator<CountResult> aggregation = getDs().createAggregation(Book.class)
                                                    .group("author", grouping("count", new Accumulator("$sum", 1)))
-                                                   .sort(Sort.ascending("_id"))
+                                                   .sort(ascending("_id"))
                                                    .aggregate(CountResult.class);
 
         CountResult result1 = aggregation.next();
@@ -81,9 +83,9 @@ public class AggregationTest extends TestBase {
         // when
         Iterator<City> citiesOrderedByDistanceFromLondon = getDs().createAggregation(City.class)
                                                                   .geoNear(GeoNear.builder("distance")
-                                                                                    .setNear(latitude, longitude)
-                                                                                    .setSpherical(true)
-                                                                                    .build())
+                                                                                  .setNear(latitude, longitude)
+                                                                                  .setSpherical(true)
+                                                                                  .build())
                                                                   .aggregate(City.class);
 
         // then
@@ -207,7 +209,7 @@ public class AggregationTest extends TestBase {
                                           .project(projection("_id").suppress(),
                                                    projection("author", "_id"),
                                                    projection("copies", divide(projection("copies"), 5)))
-                                          .sort(Sort.ascending("author"))
+                                          .sort(ascending("author"))
                                           .aggregate(Book.class);
         Book book = aggregate.next();
         Assert.assertEquals("Dante", book.author);
@@ -233,11 +235,13 @@ public class AggregationTest extends TestBase {
     @Test
     public void testUnwind() throws ParseException {
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-        getDs().save(new User("jane", format.parse("2011-03-02"), "golf", "racquetball"),
-                     new User("joe", format.parse("2012-07-02"), "tennis", "golf", "swimming"));
+        getDs().save(new User("jane", LocalDate.of(2011, 3, 2), "golf", "racquetball"),
+                     new User("joe", LocalDate.of(2012, 7, 2), "tennis", "golf", "swimming"));
 
         Iterator<User> aggregate = getDs().createAggregation(User.class)
-                                          .project(projection("_id").suppress(), projection("name"), projection("joined"),
+                                          .project(projection("_id").suppress(),
+                                                   projection("name"),
+                                                   projection("joined"),
                                                    projection("likes"))
                                           .unwind("likes")
                                           .aggregate(User.class);
@@ -305,17 +309,18 @@ public class AggregationTest extends TestBase {
     }
 
     @Entity("users")
+    @Converters(LocalDateConverter.class)
     private static final class User {
         @Id
         private ObjectId id;
         private String name;
-        private Date joined;
+        private LocalDate joined;
         private List<String> likes;
 
         private User() {
         }
 
-        private User(final String name, final Date joined, final String... likes) {
+        private User(final String name, final LocalDate joined, final String... likes) {
             this.name = name;
             this.joined = joined;
             this.likes = Arrays.asList(likes);

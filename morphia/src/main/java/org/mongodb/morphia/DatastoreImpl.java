@@ -62,6 +62,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
@@ -212,32 +214,33 @@ public class DatastoreImpl implements AdvancedDatastore {
 
     @Override
     public void ensureCaps() {
-        for (final MappedClass mc : mapper.getMappedClasses()) {
-            if (mc.getEntityAnnotation() != null && mc.getEntityAnnotation().cap().value() > 0) {
-                final CappedAt cap = mc.getEntityAnnotation().cap();
-                final String collName = mapper.getCollectionName(mc.getClazz());
-                final BasicDBObjectBuilder dbCapOpts = BasicDBObjectBuilder.start("capped", true);
-                if (cap.value() > 0) {
-                    dbCapOpts.add("size", cap.value());
-                }
-                if (cap.count() > 0) {
-                    dbCapOpts.add("max", cap.count());
-                }
-                final DB database = getDB();
-                if (database.getCollectionNames().contains(collName)) {
-                    final DBObject dbResult = database.command(BasicDBObjectBuilder.start("collstats", collName).get());
-                    if (dbResult.containsField("capped")) {
-                        // TODO: check the cap options.
-                        LOG.debug("DBCollection already exists and is capped already; doing nothing. " + dbResult);
-                    } else {
-                        LOG.warning("DBCollection already exists with same name(" + collName
-                                        + ") and is not capped; not creating capped version!");
-                    }
-                } else {
-                    getDB().createCollection(collName, dbCapOpts.get());
-                    LOG.debug("Created capped DBCollection (" + collName + ") with opts " + dbCapOpts);
-                }
-            }
+        // TODO: check the cap options.
+        mapper.getMappedClasses().stream()
+              .filter(mc -> mc.getEntityAnnotation() != null && mc.getEntityAnnotation().cap().value() > 0)
+              .forEach(mc -> {
+                  final CappedAt cap = mc.getEntityAnnotation().cap();
+                  final String collName = mapper.getCollectionName(mc.getClazz());
+                  final BasicDBObjectBuilder dbCapOpts = BasicDBObjectBuilder.start("capped", true);
+                  addIf(() -> cap.value() > 0, dbCapOpts, "size", cap.value());
+                  addIf(() -> cap.count() > 0, dbCapOpts, "max", cap.count());
+                  final DB database = getDB();
+                  if (database.getCollectionNames().contains(collName)) {
+                      if (database.getCollection(collName).isCapped()) {
+                          LOG.debug("DBCollection already exists and is capped already; doing nothing. ");
+                      } else {
+                          LOG.warning("DBCollection already exists with same name(" + collName
+                                      + ") and is not capped; not creating capped version!");
+                      }
+                  } else {
+                      database.createCollection(collName, dbCapOpts.get());
+                      LOG.debug("Created capped DBCollection (" + collName + ") with opts " + dbCapOpts);
+                  }
+              });
+    }
+
+    private void addIf(BooleanSupplier criteria, BasicDBObjectBuilder dbObjectBuilder, String key, long value) {
+        if (criteria.getAsBoolean()) {
+            dbObjectBuilder.add(key, value);
         }
     }
 
@@ -398,7 +401,8 @@ public class DatastoreImpl implements AdvancedDatastore {
         final String collectionName = mapper.getCollectionName(clazz);
         final String keyCollection = mapper.updateCollection(key);
         if (!collectionName.equals(keyCollection)) {
-            throw new RuntimeException("collection names don't match for key and class: " + collectionName + " != " + keyCollection);
+            throw new RuntimeException(
+                    "collection names don't match for key and class: " + collectionName + " != " + keyCollection);
         }
 
         return get(clazz, key.getId());
@@ -429,10 +433,9 @@ public class DatastoreImpl implements AdvancedDatastore {
         for (final Map.Entry<String, List<Key>> entry : kindMap.entrySet()) {
             final List<Key> kindKeys = entry.getValue();
 
-            final List<Object> objIds = new ArrayList<Object>();
-            for (final Key key : kindKeys) {
-                objIds.add(key.getId());
-            }
+            final List<Object> objIds = kindKeys.stream()
+                                                .map(Key::getId)
+                                                .collect(Collectors.toList());
             final List kindResults = find(entry.getKey(), null).disableValidation().filter("_id in", objIds).asList();
             entities.addAll(kindResults);
         }
@@ -528,7 +531,8 @@ public class DatastoreImpl implements AdvancedDatastore {
                 break;
         }
 
-        final MapReduceCommand cmd = new MapReduceCommand(dbColl, map, reduce, outColl, outType, query.getQueryObject());
+        final MapReduceCommand cmd = new MapReduceCommand(dbColl, map, reduce, outColl, outType, query
+                .getQueryObject());
 
         if (query.getLimit() > 0) {
             cmd.setLimit(query.getLimit());
@@ -580,7 +584,8 @@ public class DatastoreImpl implements AdvancedDatastore {
         final DBCollection dbColl = query.getCollection();
 
         final MapReduceCommand cmd = new MapReduceCommand(dbColl, baseCommand.getMap(), baseCommand.getReduce(),
-                                                          baseCommand.getOutputTarget(), outType, query.getQueryObject());
+                                                          baseCommand.getOutputTarget(), outType, query
+                                                                  .getQueryObject());
         cmd.setFinalize(baseCommand.getFinalize());
         cmd.setScope(baseCommand.getScope());
 
@@ -1098,7 +1103,8 @@ public class DatastoreImpl implements AdvancedDatastore {
                 List<String> namePath = new ArrayList<String>();
                 final MappedField mappedField = findField(namePath, mc, value);
                 if (!options.disableValidation() && mappedField == null) {
-                    throw new MappingException(format("Unknown field '%s' for index: %s", value, mc.getClazz().getName()));
+                    throw new MappingException(format("Unknown field '%s' for index: %s", value, mc.getClazz()
+                                                                                                   .getName()));
                 } else {
                     StringBuilder sb = new StringBuilder();
                     for (String s : namePath) {
@@ -1233,7 +1239,7 @@ public class DatastoreImpl implements AdvancedDatastore {
         if (idValue != null && newVersion != 1) {
             final Query<?> query = find(dbColl.getName(), entity.getClass());
             boolean compoundId = !ReflectionUtils.isPrimitiveLike(mc.getMappedIdField().getType())
-                                     && idValue instanceof DBObject;
+                                 && idValue instanceof DBObject;
             if (compoundId) {
                 query.disableValidation();
             }
@@ -1337,7 +1343,8 @@ public class DatastoreImpl implements AdvancedDatastore {
         if (value.contains(".")) {
             String segment = value.substring(0, value.indexOf("."));
             MappedField field = findField(namePath, mc, segment);
-            MappedClass mappedClass = getMapper().getMappedClass(field.getSubType() != null ? field.getSubType() : field.getConcreteType());
+            MappedClass mappedClass = getMapper()
+                    .getMappedClass(field.getSubType() != null ? field.getSubType() : field.getConcreteType());
             return findField(namePath, mappedClass, value.substring(value.indexOf(".") + 1));
         } else {
             MappedField mf = mc.getMappedField(value);
@@ -1415,7 +1422,8 @@ public class DatastoreImpl implements AdvancedDatastore {
                     throw new MappingException(format("Missing _id after save on %s", entity.getClass().getName()));
                 }
                 mapper.updateKeyAndVersionInfo(entity, dbObj, createCache());
-                keys.add(new Key<T>((Class<? extends T>) entity.getClass(), collection.getName(), mapper.getId(entity)));
+                keys.add(new Key<T>((Class<? extends T>) entity.getClass(), collection.getName(), mapper
+                        .getId(entity)));
             }
             mapper.getMappedClass(entity).callLifecycleMethods(PostPersist.class, entity, dbObj);
         }
@@ -1434,22 +1442,25 @@ public class DatastoreImpl implements AdvancedDatastore {
         // Ensure indexes from class annotation
         final List<Indexes> indexes = mc.getAnnotations(Indexes.class);
         if (indexes != null) {
-            for (final Indexes idx : indexes) {
-                if (idx.value().length > 0) {
-                    for (final Index index : idx.value()) {
-                        if (index.fields().length != 0) {
-                            ensureIndex(mc, dbColl, index.fields(), index.options(), background, parentMCs, parentMFs);
-                        } else {
-                            LOG.warning(format("This index on '%s' is using deprecated configuration options.  Please update to use the "
-                                                   + "fields value on @Index: %s", mc.getClazz().getName(), index.toString()));
-                            final BasicDBObject fields = parseFieldsString(index.value(), mc.getClazz(), mapper,
-                                                                           !index.disableValidation(), parentMCs, parentMFs);
-                            ensureIndex(dbColl, index.name(), fields, index.unique(), index.dropDups(),
-                                        index.background() ? index.background() : background, index.sparse(), index.expireAfterSeconds());
-                        }
-                    }
-                }
-            }
+            indexes.stream()
+                   .filter(idx -> idx.value().length > 0)
+                   .forEach(idx -> {
+                       for (final Index index : idx.value()) {
+                           if (index.fields().length != 0) {
+                               ensureIndex(mc, dbColl, index.fields(), index
+                                       .options(), background, parentMCs, parentMFs);
+                           } else {
+                               LOG.warning(format(
+                                       "This index on '%s' is using deprecated configuration options.  Please update to use the "
+                                       + "fields value on @Index: %s", mc.getClazz().getName(), index.toString()));
+                               final BasicDBObject fields = parseFieldsString(index.value(), mc.getClazz(), mapper,
+                                                                              !index.disableValidation(), parentMCs, parentMFs);
+                               ensureIndex(dbColl, index.name(), fields, index.unique(), index.dropDups(),
+                                           index.background() ? index.background() : background, index.sparse(), index
+                                                   .expireAfterSeconds());
+                           }
+                       }
+                   });
         }
     }
 
@@ -1476,11 +1487,13 @@ public class DatastoreImpl implements AdvancedDatastore {
                 final IndexOptions options = index.options();
                 final BasicDBObject newOptions = (BasicDBObject) extractOptions(options, false);
                 if (!oldOptions.isEmpty() && !newOptions.isEmpty()) {
-                    throw new MappingException("Mixed usage of deprecated @Indexed value with the new @IndexOption values is not "
-                                                   + "allowed.  Please migrate all settings to @IndexOptions");
+                    throw new MappingException(
+                            "Mixed usage of deprecated @Indexed value with the new @IndexOption values is not "
+                            + "allowed.  Please migrate all settings to @IndexOptions");
                 }
                 if (!newOptions.isEmpty()) {
-                    ensureIndex(dbColl, new BasicDBObject(prefix + mf.getNameToStore(), index.value().toIndexValue()), newOptions);
+                    ensureIndex(dbColl, new BasicDBObject(
+                            prefix + mf.getNameToStore(), index.value().toIndexValue()), newOptions);
                 } else {
                     ensureIndex(dbColl,
                                 index.name(),
@@ -1498,12 +1511,13 @@ public class DatastoreImpl implements AdvancedDatastore {
             }
 
             if (!mf.isTypeMongoCompatible() && !mf.hasAnnotation(Reference.class) && !mf.hasAnnotation(Serialized.class)
-                    && !mf.hasAnnotation(NotSaved.class) && !mf.hasAnnotation(Transient.class)) {
+                && !mf.hasAnnotation(NotSaved.class) && !mf.hasAnnotation(Transient.class)) {
                 final List<MappedClass> newParentClasses = new ArrayList<MappedClass>(parentMCs);
                 final List<MappedField> newParents = new ArrayList<MappedField>(parentMFs);
                 newParentClasses.add(mc);
                 newParents.add(mf);
-                ensureIndexes(dbColl, mapper.getMappedClass(mf.isSingleValue() ? mf.getType() : mf.getSubClass()), background,
+                ensureIndexes(dbColl, mapper
+                                      .getMappedClass(mf.isSingleValue() ? mf.getType() : mf.getSubClass()), background,
                               newParentClasses, newParents);
             }
         }
@@ -1573,7 +1587,8 @@ public class DatastoreImpl implements AdvancedDatastore {
             dbColl = getCollection(query.getEntityClass());
         }
 
-        if (query.getSortObject() != null && query.getSortObject().keySet() != null && !query.getSortObject().keySet().isEmpty()) {
+        if (query.getSortObject() != null && query.getSortObject().keySet() != null && !query.getSortObject().keySet()
+                                                                                             .isEmpty()) {
             throw new QueryException("sorting is not allowed for updates.");
         }
         if (query.getOffset() > 0) {
@@ -1602,8 +1617,9 @@ public class DatastoreImpl implements AdvancedDatastore {
         }
 
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Executing update(" + dbColl.getName() + ") for query: " + q + ", ops: " + u + ", multi: " + multi + ", upsert: "
-                          + createIfMissing);
+            LOG.trace("Executing update(" + dbColl.getName() + ") for query: " + q + ", ops: " + u + ", multi: " + multi
+                      + ", upsert: "
+                      + createIfMissing);
         }
 
         final WriteResult wr;

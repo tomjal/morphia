@@ -40,11 +40,12 @@ import java.util.Map;
 
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
 
 
 /**
  * Represents a mapped class between the MongoDB DBObject and the java POJO.
- * <p/>
+ * <p>
  * This class will validate classes to make sure they meet the requirement for persistence.
  *
  * @author Scott Hernandez
@@ -56,7 +57,7 @@ public class MappedClass {
      *
      * @see #addInterestingAnnotation
      */
-    private static final List<Class<? extends Annotation>> INTERESTING_ANNOTATIONS = new ArrayList<Class<? extends Annotation>>();
+    private static final List<Class<? extends Annotation>> INTERESTING_ANNOTATIONS = new ArrayList<>();
     /**
      * Annotations interesting for life-cycle events
      */
@@ -81,17 +82,15 @@ public class MappedClass {
     /**
      * Annotations we were interested in, and found.
      */
-    private final Map<Class<? extends Annotation>, List<Annotation>> foundAnnotations =
-        new HashMap<Class<? extends Annotation>, List<Annotation>>();
+    private final Map<Class<? extends Annotation>, List<Annotation>> foundAnnotations = new HashMap<>();
     /**
      * Methods which are life-cycle events
      */
-    private final Map<Class<? extends Annotation>, List<ClassMethodPair>> lifecycleMethods =
-        new HashMap<Class<? extends Annotation>, List<ClassMethodPair>>();
+    private final Map<Class<? extends Annotation>, List<ClassMethodPair>> lifecycleMethods = new HashMap<>();
     /**
      * a list of the fields to map
      */
-    private final List<MappedField> persistenceFields = new ArrayList<MappedField>();
+    private final List<MappedField> persistenceFields = new ArrayList<>();
     /**
      * the type we are mapping to/from
      */
@@ -179,7 +178,7 @@ public class MappedClass {
         }
 
         if (!foundAnnotations.containsKey(clazz)) {
-            foundAnnotations.put(clazz, new ArrayList<Annotation>());
+            foundAnnotations.put(clazz, new ArrayList<>());
         }
 
         foundAnnotations.get(clazz).add(ann);
@@ -200,15 +199,13 @@ public class MappedClass {
         try {
             Object tempObj;
             if (methodPairs != null) {
-                final HashMap<Class<?>, Object> toCall = new HashMap<Class<?>, Object>((int) (methodPairs.size() * 1.3));
+                final HashMap<Class<?>, Object> toCall = new HashMap<>((int) (methodPairs.size() * 1.3));
                 for (final ClassMethodPair cm : methodPairs) {
                     toCall.put(cm.clazz, null);
                 }
-                for (final Class<?> c : toCall.keySet()) {
-                    if (c != null) {
-                        toCall.put(c, getOrCreateInstance(c));
-                    }
-                }
+                toCall.keySet().stream()
+                      .filter(c -> c != null)
+                      .forEach(c -> toCall.put(c, getOrCreateInstance(c)));
 
                 for (final ClassMethodPair cm : methodPairs) {
                     final Method method = cm.method;
@@ -216,7 +213,8 @@ public class MappedClass {
                     method.setAccessible(true);
 
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug(format("Calling lifecycle method(@%s %s) on %s", event.getSimpleName(), method, inst));
+                        LOG.debug(format("Calling lifecycle method(@%s %s) on %s", event
+                                .getSimpleName(), method, inst));
                     }
 
                     if (inst == null) {
@@ -240,9 +238,7 @@ public class MappedClass {
             }
 
             callGlobalInterceptors(event, entity, dbObj, mapper.getInterceptors());
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        } catch (InvocationTargetException e) {
+        } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
 
@@ -294,7 +290,8 @@ public class MappedClass {
      */
     public String getCollectionName() {
         if (entityAn == null || entityAn.value().equals(Mapper.IGNORED_FIELDNAME)) {
-            return mapper.getOptions().isUseLowerCaseCollectionNames() ? clazz.getSimpleName().toLowerCase() : clazz.getSimpleName();
+            return mapper.getOptions().isUseLowerCaseCollectionNames() ? clazz.getSimpleName().toLowerCase() : clazz
+                    .getSimpleName();
         }
         return entityAn.value();
     }
@@ -320,13 +317,9 @@ public class MappedClass {
      * @return the list of fields
      */
     public List<MappedField> getFieldsAnnotatedWith(final Class<? extends Annotation> clazz) {
-        final List<MappedField> results = new ArrayList<MappedField>();
-        for (final MappedField mf : persistenceFields) {
-            if (mf.getAnnotations().containsKey(clazz)) {
-                results.add(mf);
-            }
-        }
-        return results;
+        return persistenceFields.stream()
+                                .filter(mf -> mf.getAnnotations().containsKey(clazz))
+                                .collect(toList());
     }
 
     /**
@@ -450,7 +443,8 @@ public class MappedClass {
 
     @Override
     public String toString() {
-        return "MappedClass - kind:" + getCollectionName() + " for " + getClazz().getName() + " fields:" + persistenceFields;
+        return "MappedClass - kind:" + getCollectionName() + " for " + getClazz().getName() + " fields:"
+               + persistenceFields;
     }
 
     /**
@@ -486,11 +480,9 @@ public class MappedClass {
      * Discovers interesting (that we care about) things about the class.
      */
     protected void discover() {
-        for (final Class<? extends Annotation> c : INTERESTING_ANNOTATIONS) {
-            addAnnotation(c);
-        }
+        INTERESTING_ANNOTATIONS.forEach(this::addAnnotation);
 
-        final List<Class<?>> lifecycleClasses = new ArrayList<Class<?>>();
+        final List<Class<?>> lifecycleClasses = new ArrayList<>();
         lifecycleClasses.add(clazz);
 
         final EntityListeners entityLisAnn = (EntityListeners) getAnnotation(EntityListeners.class);
@@ -500,11 +492,9 @@ public class MappedClass {
 
         for (final Class<?> cls : lifecycleClasses) {
             for (final Method m : ReflectionUtils.getDeclaredAndInheritedMethods(cls)) {
-                for (final Class<? extends Annotation> c : LIFECYCLE_ANNOTATIONS) {
-                    if (m.isAnnotationPresent(c)) {
-                        addLifecycleEventMethod(c, m, cls.equals(clazz) ? null : cls);
-                    }
-                }
+                LIFECYCLE_ANNOTATIONS.stream()
+                                     .filter(m::isAnnotationPresent)
+                                     .forEach(c -> addLifecycleEventMethod(c, m, cls.equals(clazz) ? null : cls));
             }
         }
 
@@ -528,7 +518,8 @@ public class MappedClass {
                     if (mapper.getOptions().getDefaultMapper() != null) {
                         persistenceFields.add(new MappedField(field, clazz, getMapper()));
                     } else if (LOG.isWarningEnabled()) {
-                        LOG.warning(format("Ignoring (will not persist) field: %s.%s [type:%s]", clazz.getName(), field.getName(),
+                        LOG.warning(format("Ignoring (will not persist) field: %s.%s [type:%s]", clazz.getName(), field
+                                                   .getName(),
                                            field.getType().getName()));
                     }
                 }
@@ -551,7 +542,7 @@ public class MappedClass {
         if (lifecycleMethods.containsKey(lceClazz)) {
             lifecycleMethods.get(lceClazz).add(cm);
         } else {
-            final List<ClassMethodPair> methods = new ArrayList<ClassMethodPair>();
+            final List<ClassMethodPair> methods = new ArrayList<>();
             methods.add(cm);
             lifecycleMethods.put(lceClazz, methods);
         }
@@ -560,9 +551,7 @@ public class MappedClass {
     private void callGlobalInterceptors(final Class<? extends Annotation> event, final Object entity, final DBObject dbObj,
                                         final Collection<EntityInterceptor> interceptors) {
         for (final EntityInterceptor ei : interceptors) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Calling interceptor method " + event.getSimpleName() + " on " + ei);
-            }
+            LOG.debug("Calling interceptor method " + event.getSimpleName() + " on " + ei);
 
             if (event.equals(PreLoad.class)) {
                 ei.preLoad(entity, dbObj, mapper);

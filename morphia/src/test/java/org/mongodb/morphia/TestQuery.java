@@ -20,7 +20,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.MongoException;
-import com.mongodb.MongoInternalException;
 import org.bson.types.CodeWScope;
 import org.bson.types.ObjectId;
 import org.junit.After;
@@ -52,12 +51,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -934,24 +933,16 @@ public class TestQuery extends TestBase {
 
         assertEquals(0, query.countAll());
 
-        executorService.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                getDs().save(new CappedPic(System.currentTimeMillis() + ""));
-            }
-        }, 0, 500, TimeUnit.MILLISECONDS);
+        executorService.scheduleAtFixedRate(() -> getDs().save(new CappedPic(System.currentTimeMillis() + "")), 0, 500, MILLISECONDS);
 
         final Iterator<CappedPic> tail = query.tail();
         Awaitility
             .await()
             .pollDelay(1, TimeUnit.SECONDS)
             .atMost(30, TimeUnit.SECONDS)
-            .until(new Callable<Boolean>() {
-                @Override
-                public Boolean call() throws Exception {
-                    found.add(tail.next());
-                    return found.size() >= 10;
-                }
+            .until(() -> {
+                found.add(tail.next());
+                return found.size() >= 10;
             });
         executorService.shutdownNow();
         Assert.assertTrue(query.countAll() >= 10);
@@ -980,8 +971,6 @@ public class TestQuery extends TestBase {
             // must fail
             assertNotNull(getDs().find(PhotoWithKeywords.class).where(hasKeyword.getCode()).get());
             Assert.fail("Invalid javascript magically isn't invalid anymore?");
-        } catch (MongoInternalException e) {
-            // fine
         } catch (MongoException e) {
             // fine
         }

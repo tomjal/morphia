@@ -36,9 +36,7 @@ public class LazyWithNoProxiesTest extends ProxyTestBase {
         Assert.assertNotNull(loadedEntity);
         assertNotProxy(loadedEntity.otherEntity);
         Assert.assertEquals(count, loadedEntity.list.size());
-        for (OtherEntity item : loadedEntity.list) {
-            assertNotProxy(item);
-        }
+        loadedEntity.list.forEach(this::assertNotProxy);
     }
 
     public enum SomeEnum {

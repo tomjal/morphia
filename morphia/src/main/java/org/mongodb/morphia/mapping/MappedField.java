@@ -48,7 +48,7 @@ import static java.util.Arrays.asList;
 public class MappedField {
     private static final Logger LOG = MorphiaLoggerFactory.get(MappedField.class);
     // The Annotations to look for when reflecting on the field (stored in the mappingAnnotations)
-    private static final List<Class<? extends Annotation>> INTERESTING = new ArrayList<Class<? extends Annotation>>();
+    private static final List<Class<? extends Annotation>> INTERESTING = new ArrayList<>();
 
     static {
         INTERESTING.add(Serialized.class);
@@ -66,8 +66,8 @@ public class MappedField {
 
     private final Mapper mapper;
     // Annotations that have been found relevant to mapping
-    private final Map<Class<? extends Annotation>, Annotation> foundAnnotations = new HashMap<Class<? extends Annotation>, Annotation>();
-    private final List<MappedField> typeParameters = new ArrayList<MappedField>();
+    private final Map<Class<? extends Annotation>, Annotation> foundAnnotations = new HashMap<>();
+    private final List<MappedField> typeParameters = new ArrayList<>();
     private Class persistedClass;
     private Field field; // the field :)
     private Class realType; // the real type
@@ -262,7 +262,7 @@ public class MappedField {
      * @return the name of the field's (key)name for mongodb, in order of loading.
      */
     public List<String> getLoadNames() {
-        final List<String> names = new ArrayList<String>();
+        final List<String> names = new ArrayList<>();
         names.add(getMappedFieldName());
 
         final AlsoLoad al = (AlsoLoad) foundAnnotations.get(AlsoLoad.class);
@@ -466,9 +466,7 @@ public class MappedField {
      * Discovers interesting (that we care about) things about the field.
      */
     protected void discover() {
-        for (final Class<? extends Annotation> clazz : INTERESTING) {
-            addAnnotation(clazz);
-        }
+        INTERESTING.forEach(this::addAnnotation);
 
         //type must be discovered before the constructor.
         discoverType();
@@ -677,9 +675,7 @@ public class MappedField {
                 try {
                     constructor = type.getDeclaredConstructor();
                     constructor.setAccessible(true);
-                } catch (NoSuchMethodException e) {
-                    // never mind.
-                } catch (SecurityException e) {
+                } catch (NoSuchMethodException | SecurityException e) {
                     // never mind.
                 }
             }

@@ -28,8 +28,6 @@ import org.mongodb.morphia.mapping.validation.fieldrules.VersionMisuse;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -70,13 +68,8 @@ public class MappingValidator {
      * @param classes the MappedClasses to validate
      */
     public void validate(final List<MappedClass> classes) {
-        final Set<ConstraintViolation> ve = new TreeSet<ConstraintViolation>(new Comparator<ConstraintViolation>() {
-
-            @Override
-            public int compare(final ConstraintViolation o1, final ConstraintViolation o2) {
-                return o1.getLevel().ordinal() > o2.getLevel().ordinal() ? -1 : 1;
-            }
-        });
+        final Set<ConstraintViolation> ve = new TreeSet<>((o1, o2) -> o1.getLevel().ordinal() > o2.getLevel()
+                                                                                                  .ordinal() ? -1 : 1);
 
         final List<ClassConstraint> rules = getConstraints();
         for (final MappedClass c : classes) {
@@ -93,20 +86,15 @@ public class MappingValidator {
             }
 
             // sort by class to make it more readable
-            final List<LogLine> l = new ArrayList<LogLine>();
-            for (final ConstraintViolation v : ve) {
-                l.add(new LogLine(v));
-            }
-            Collections.sort(l);
-
-            for (final LogLine line : l) {
-                line.log(LOG);
-            }
+            ve.stream()
+              .map(LogLine::new)
+              .sorted()
+              .forEach(logLine -> logLine.log(LOG));
         }
     }
 
     private List<ClassConstraint> getConstraints() {
-        final List<ClassConstraint> constraints = new ArrayList<ClassConstraint>(32);
+        final List<ClassConstraint> constraints = new ArrayList<>(32);
 
         // normally, i do this with scanning the classpath, but that´d bring
         // another dependency ;)
@@ -189,7 +177,8 @@ public class MappingValidator {
                     logger.debug(v.render());
                     break;
                 default:
-                    throw new IllegalStateException(format("Cannot log %s of Level %s", ConstraintViolation.class.getSimpleName(),
+                    throw new IllegalStateException(format("Cannot log %s of Level %s", ConstraintViolation.class
+                                                                   .getSimpleName(),
                                                            v.getLevel()));
             }
         }

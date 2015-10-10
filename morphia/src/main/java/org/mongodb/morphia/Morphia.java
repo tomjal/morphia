@@ -53,9 +53,7 @@ public class Morphia {
      */
     public Morphia(final Mapper mapper, final Set<Class> classesToMap) {
         this.mapper = mapper;
-        for (final Class c : classesToMap) {
-            map(c);
-        }
+        classesToMap.forEach(this::map);
     }
 
     /**
@@ -198,11 +196,9 @@ public class Morphia {
      */
     public synchronized Morphia map(final Set<Class> entityClasses) {
         if (entityClasses != null && !entityClasses.isEmpty()) {
-            for (final Class entityClass : entityClasses) {
-                if (!mapper.isMapped(entityClass)) {
-                    mapper.addMappedClass(entityClass);
-                }
-            }
+            entityClasses.stream()
+                         .filter(entityClass -> !mapper.isMapped(entityClass))
+                         .forEach(mapper::addMappedClass);
         }
         return this;
     }
@@ -241,9 +237,7 @@ public class Morphia {
                 }
             }
             return this;
-        } catch (IOException e) {
-            throw new MappingException("Could not get map classes from package " + packageName, e);
-        } catch (ClassNotFoundException e) {
+        } catch (IOException | ClassNotFoundException e) {
             throw new MappingException("Could not get map classes from package " + packageName, e);
         }
     }

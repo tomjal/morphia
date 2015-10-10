@@ -43,13 +43,13 @@ public class TestTextIndexing extends TestBase {
 
         List<DBObject> indexInfo = getDs().getCollection(TextIndexAll.class).getIndexInfo();
         Assert.assertEquals(2, indexInfo.size());
-        for (DBObject dbObject : indexInfo) {
-            if (!dbObject.get("name").equals("_id_")) {
-                Assert.assertEquals(1, ((DBObject) dbObject.get("weights")).get("$**"));
-                Assert.assertEquals("english", dbObject.get("default_language"));
-                Assert.assertEquals("language", dbObject.get("language_override"));
-            }
-        }
+        indexInfo.stream()
+                 .filter(dbObject -> !dbObject.get("name").equals("_id_"))
+                 .forEach(dbObject -> {
+                     Assert.assertEquals(1, ((DBObject) dbObject.get("weights")).get("$**"));
+                     Assert.assertEquals("english", dbObject.get("default_language"));
+                     Assert.assertEquals("language", dbObject.get("language_override"));
+                 });
     }
 
     @Test
@@ -104,13 +104,12 @@ public class TestTextIndexing extends TestBase {
 
         List<DBObject> indexInfo = getDb().getCollection("randomCollection").getIndexInfo();
         Assert.assertEquals(2, indexInfo.size());
-        for (DBObject dbObject : indexInfo) {
-            if (!dbObject.get("name").equals("_id_")) {
-                Assert.assertEquals(1, ((DBObject) dbObject.get("weights")).get("$**"));
-                Assert.assertEquals("english", dbObject.get("default_language"));
-                Assert.assertEquals("language", dbObject.get("language_override"));
-            }
-        }
+        indexInfo.stream().filter(dbObject -> !dbObject.get("name").equals("_id_"))
+                 .forEach(dbObject -> {
+                     Assert.assertEquals(1, ((DBObject) dbObject.get("weights")).get("$**"));
+                     Assert.assertEquals("english", dbObject.get("default_language"));
+                     Assert.assertEquals("language", dbObject.get("language_override"));
+                 });
     }
 
     @Entity
@@ -124,9 +123,9 @@ public class TestTextIndexing extends TestBase {
 
     @Entity
     @Indexes(@Index(fields = {@Field(value = "name", type = TEXT),
-                              @Field(value = "nick", type = TEXT, weight = 10),
-                              @Field(value = "age")}, options = @IndexOptions(name = "indexing_test", language = "russian",
-                                                                                                     languageOverride = "nativeTongue")))
+            @Field(value = "nick", type = TEXT, weight = 10),
+            @Field(value = "age")}, options = @IndexOptions(name = "indexing_test", language = "russian",
+            languageOverride = "nativeTongue")))
     private static class CompoundTextIndex {
         @Id
         private ObjectId id;
@@ -149,7 +148,7 @@ public class TestTextIndexing extends TestBase {
 
     @Entity
     @Indexes({@Index(fields = @Field(value = "name", type = TEXT)),
-              @Index(fields = @Field(value = "nickName", type = TEXT))})
+            @Index(fields = @Field(value = "nickName", type = TEXT))})
     private static class MultipleTextIndexes {
         @Id
         private ObjectId id;

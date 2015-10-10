@@ -256,49 +256,40 @@ public class TestDatastore extends TestBase {
             db2User.friends.add(db2Friend);
             db2.save(db2User);
 
-            final Runnable db1Runnable = new Runnable() {
-                @Override
-                public void run() {
-                    datastoreProvider.register(db1);
-                    final FacebookUser user = db1.find(FacebookUser.class, "id", 1).get();
-                    Assert.assertNotNull(user);
-                    Assert.assertNotNull(db1.find(FacebookUser.class, "id", 3).get());
+            final Runnable db1Runnable = () -> {
+                datastoreProvider.register(db1);
+                final FacebookUser user = db1.find(FacebookUser.class, "id", 1).get();
+                Assert.assertNotNull(user);
+                Assert.assertNotNull(db1.find(FacebookUser.class, "id", 3).get());
 
-                    final FacebookUser db1FoundUser = user;
-                    Assert.assertEquals("Should find 1 friend", 1, db1FoundUser.friends.size());
-                    Assert.assertEquals("Should find the right friend", 3, db1FoundUser.friends.get(0).id);
+                final FacebookUser db1FoundUser = user;
+                Assert.assertEquals("Should find 1 friend", 1, db1FoundUser.friends.size());
+                Assert.assertEquals("Should find the right friend", 3, db1FoundUser.friends.get(0).id);
 
-                    Assert.assertNull(db1.find(FacebookUser.class, "id", 2).get());
-                    Assert.assertNull(db1.find(FacebookUser.class, "id", 4).get());
-                }
+                Assert.assertNull(db1.find(FacebookUser.class, "id", 2).get());
+                Assert.assertNull(db1.find(FacebookUser.class, "id", 4).get());
             };
-            final Runnable db2Runnable = new Runnable() {
-                @Override
-                public void run() {
-                    datastoreProvider.register(db2);
-                    Assert.assertNull(db2.find(FacebookUser.class, "id", 1).get());
-                    Assert.assertNull(db2.find(FacebookUser.class, "id", 3).get());
+            final Runnable db2Runnable = () -> {
+                datastoreProvider.register(db2);
+                Assert.assertNull(db2.find(FacebookUser.class, "id", 1).get());
+                Assert.assertNull(db2.find(FacebookUser.class, "id", 3).get());
 
-                    final FacebookUser db2FoundUser = db2.find(FacebookUser.class, "id", 2).get();
-                    Assert.assertNotNull(db2FoundUser);
-                    Assert.assertNotNull(db2.find(FacebookUser.class, "id", 4).get());
-                    Assert.assertEquals("Should find 1 friend", 1, db2FoundUser.friends.size());
-                    Assert.assertEquals("Should find the right friend", 4, db2FoundUser.friends.get(0).id);
+                final FacebookUser db2FoundUser = db2.find(FacebookUser.class, "id", 2).get();
+                Assert.assertNotNull(db2FoundUser);
+                Assert.assertNotNull(db2.find(FacebookUser.class, "id", 4).get());
+                Assert.assertEquals("Should find 1 friend", 1, db2FoundUser.friends.size());
+                Assert.assertEquals("Should find the right friend", 4, db2FoundUser.friends.get(0).id);
 
-                }
             };
 
-            final Callable<Boolean> standardRunnable = new Callable<Boolean>() {
-                @Override
-                public Boolean call() throws Exception {
-                    datastoreProvider.register(standard);
-                    Assert.assertNull(getDs().find(FacebookUser.class, "id", 1).get());
-                    Assert.assertNull(getDs().find(FacebookUser.class, "id", 2).get());
-                    Assert.assertNull(getDs().find(FacebookUser.class, "id", 3).get());
-                    Assert.assertNull(getDs().find(FacebookUser.class, "id", 4).get());
+            final Callable<Boolean> standardRunnable = () -> {
+                datastoreProvider.register(standard);
+                Assert.assertNull(getDs().find(FacebookUser.class, "id", 1).get());
+                Assert.assertNull(getDs().find(FacebookUser.class, "id", 2).get());
+                Assert.assertNull(getDs().find(FacebookUser.class, "id", 3).get());
+                Assert.assertNull(getDs().find(FacebookUser.class, "id", 4).get());
 
-                    return true;
-                }
+                return true;
             };
 
             final Future<?> submit = pool.submit(db1Runnable);
@@ -388,12 +379,7 @@ public class TestDatastore extends TestBase {
         Awaitility
             .await()
             .atMost(30, TimeUnit.SECONDS)
-            .until(new Callable<Boolean>() {
-                @Override
-                public Boolean call() throws Exception {
-                    return collection.count() == count;
-                }
-            });
+            .until(() -> collection.count() == count);
         assertEquals(count, collection.count());
 
         for (FacebookUser user : list) {

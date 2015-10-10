@@ -2,7 +2,6 @@ package org.mongodb.morphia.query;
 
 
 import com.mongodb.MongoException;
-import com.mongodb.MongoInternalException;
 import org.bson.types.ObjectId;
 import org.junit.Assert;
 import org.junit.Test;
@@ -156,8 +155,6 @@ public class TestGeoQueries extends TestBase {
                            .near(0, 0)
                            .get();
             Assert.assertFalse(true);
-        } catch (MongoInternalException e) {
-            Assert.assertNull(found);
         } catch (MongoException e) {
             Assert.assertNull(found);
         }

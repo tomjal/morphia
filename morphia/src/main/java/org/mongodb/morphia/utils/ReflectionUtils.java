@@ -551,8 +551,7 @@ public final class ReflectionUtils {
     public static Set<Class<?>> getFromJARFile(final ClassLoader loader, final String jar, final String packageName)
         throws IOException, ClassNotFoundException {
         final Set<Class<?>> classes = new HashSet<Class<?>>();
-        final JarInputStream jarFile = new JarInputStream(new FileInputStream(jar));
-        try {
+        try (JarInputStream jarFile = new JarInputStream(new FileInputStream(jar))) {
             JarEntry jarEntry;
             do {
                 jarEntry = jarFile.getNextJarEntry();
@@ -564,8 +563,6 @@ public final class ReflectionUtils {
                     }
                 }
             } while (jarEntry != null);
-        } finally {
-            jarFile.close();
         }
         return classes;
     }

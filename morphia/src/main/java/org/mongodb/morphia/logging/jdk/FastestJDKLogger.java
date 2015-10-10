@@ -104,9 +104,7 @@ public class FastestJDKLogger implements org.mongodb.morphia.logging.Logger {
     }
 
     protected void log(final Level l, final String m, final Throwable t) {
-        if (logger.isLoggable(l)) {
-            logger.logp(l, className, null, m, t);
-        }
+        logger.logp(l, className, null, t, () -> m);
     }
 
     protected void log(final Level l, final String f, final Object... a) {
