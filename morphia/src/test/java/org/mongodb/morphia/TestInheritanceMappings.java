@@ -16,6 +16,7 @@ package org.mongodb.morphia;
 
 
 import org.bson.types.ObjectId;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Before;
 import org.junit.Test;
 import org.mongodb.morphia.annotations.Entity;
@@ -268,7 +269,7 @@ public class TestInheritanceMappings extends TestBase {
         }
 
         @Override
-        public void putAll(final Map<? extends String, ? extends String> m) {
+        public void putAll(@NotNull final Map<? extends String, ? extends String> m) {
             realMap.putAll(m);
         }
 
@@ -277,16 +278,19 @@ public class TestInheritanceMappings extends TestBase {
             realMap.clear();
         }
 
+        @NotNull
         @Override
         public Set<String> keySet() {
             return realMap.keySet();
         }
 
+        @NotNull
         @Override
         public Collection<String> values() {
             return realMap.values();
         }
 
+        @NotNull
         @Override
         public Set<Entry<String, String>> entrySet() {
             return realMap.entrySet();

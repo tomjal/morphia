@@ -43,42 +43,31 @@ public class NameValuePairTest extends TestBase {
 
         @Override
         public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + ((name == null) ? 0 : name.hashCode());
-            result = prime * result + ((value == null) ? 0 : value.hashCode());
+            int result = value != null ? value.hashCode() : 0;
+            result = 31 * result + (name != null ? name.hashCode() : 0);
             return result;
         }
 
         @Override
-        public boolean equals(final Object obj) {
-            if (this == obj) {
+        public boolean equals(Object o) {
+            if (this == o) {
                 return true;
             }
-            if (obj == null) {
+            if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            if (getClass() != obj.getClass()) {
+
+            NameValuePair<?, ?> that = (NameValuePair<?, ?>) o;
+
+            if (value != null ? !value.equals(that.value) : that.value != null) {
                 return false;
             }
-            final NameValuePair other = (NameValuePair) obj;
-            if (name == null) {
-                if (other.name != null) {
-                    return false;
-                }
-            } else if (!name.equals(other.name)) {
+            if (name != null ? !name.equals(that.name) : that.name != null) {
                 return false;
             }
-            if (value == null) {
-                if (other.value != null) {
-                    return false;
-                }
-            } else if (!value.equals(other.value)) {
-                return false;
-            }
+
             return true;
         }
-
     }
 
 }

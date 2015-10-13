@@ -19,6 +19,9 @@ package relocated.morphia.org.apache.commons.collections;
 
 //CHECKSTYLE:OFF
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -376,21 +379,23 @@ public class ReferenceMap extends AbstractMap {
      *
      * @return a set view of this map's keys
      */
+    @NotNull
     @Override
     public Set keySet() {
         if (keySet != null) {
             return keySet;
         }
         keySet = new AbstractSet() {
+            @NotNull
             @Override
             public Iterator iterator() {
                 return new KeyIterator();
-            }            @Override
+            }
+
+            @Override
             public int size() {
                 return size;
             }
-
-
 
             @Override
             public boolean contains(final Object o) {
@@ -418,6 +423,7 @@ public class ReferenceMap extends AbstractMap {
      *
      * @return a collection view of this map's values.
      */
+    @NotNull
     @Override
     public Collection values() {
         if (values != null) {
@@ -434,6 +440,7 @@ public class ReferenceMap extends AbstractMap {
                 ReferenceMap.this.clear();
             }
 
+            @NotNull
             @Override
             public Iterator iterator() {
                 return new ValueIterator();
@@ -447,6 +454,7 @@ public class ReferenceMap extends AbstractMap {
      *
      * @return a set view of this map's entries
      */
+    @NotNull
     @Override
     public Set entrySet() {
         if (entrySet != null) {
@@ -490,6 +498,7 @@ public class ReferenceMap extends AbstractMap {
             }
 
 
+            @NotNull
             @Override
             public Iterator iterator() {
                 return new EntryIterator();
@@ -503,7 +512,7 @@ public class ReferenceMap extends AbstractMap {
 
             @Override
             @SuppressWarnings("unchecked")
-            public Object[] toArray(final Object[] arr) {
+            public Object[] toArray(@NotNull final Object[] arr) {
                 final List list = new ArrayList();
                 for (Object o : this) {
                     final Entry e = (Entry) o;
@@ -521,6 +530,7 @@ public class ReferenceMap extends AbstractMap {
      * @param key the key of the entry to look up
      * @return the entry associated with that key, or null if the key is not in this map
      */
+    @Nullable
     private Entry getEntry(final Object key) {
         if (key == null) {
             return null;

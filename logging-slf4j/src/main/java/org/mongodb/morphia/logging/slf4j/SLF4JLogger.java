@@ -88,7 +88,9 @@ public class SLF4JLogger implements org.mongodb.morphia.logging.Logger {
 
     @Override
     public void warning(final String msg) {
-        this.logger.warn(msg);
+        if (isWarningEnabled()) {
+            this.logger.warn(msg);
+        }
     }
 
     @Override
@@ -108,7 +110,9 @@ public class SLF4JLogger implements org.mongodb.morphia.logging.Logger {
 
     @Override
     public void error(final String msg) {
-        this.logger.error(msg);
+        if (isErrorEnabled()) {
+            this.logger.error(msg);
+        }
     }
 
     @Override

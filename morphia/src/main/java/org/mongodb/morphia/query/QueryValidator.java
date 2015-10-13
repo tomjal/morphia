@@ -26,6 +26,7 @@ import org.mongodb.morphia.query.validation.ValidationFailure;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static java.lang.String.format;
 
@@ -65,10 +66,11 @@ final class QueryValidator {
                 if (mf == null && !fieldIsArrayOperator) {
                     mf = mc.getMappedFieldByJavaField(part);
                     if (mf == null) {
-                        throw new ValidationException(format("The field '%s' could not be found in '%s' while validating - %s; if "
-                                                             + "you wish to continue please disable validation.", part,
-                                                             mc.getClazz().getName(), prop
-                                                            ));
+                        throw new ValidationException(format(
+                                "The field '%s' could not be found in '%s' while validating - %s; if "
+                                + "you wish to continue please disable validation.", part,
+                                mc.getClazz().getName(), prop
+                        ));
                     }
                     hasTranslations = true;
                     parts[i] = mf.getNameToStore();
@@ -88,11 +90,12 @@ final class QueryValidator {
                     //catch people trying to search/update into @Reference/@Serialized fields
                     if (!canQueryPast(mf)) {
                         throw new ValidationException(format("Cannot use dot-notation past '%s' in '%s'; found while"
-                                                             + " validating - %s", part, mc.getClazz().getName(), prop));
+                                                             + " validating - %s", part, mc.getClazz()
+                                                                                           .getName(), prop));
                     }
 
                     //get the next MappedClass for the next field validation
-                    mc = mapper.getMappedClass((mf.isSingleValue()) ? mf.getType() : mf.getSubClass());
+                    mc = mapper.getMappedClass((mf.isSingleValue()) ? mf.getType() : mf.getSubClass().get());
                 }
             }
 
@@ -109,20 +112,20 @@ final class QueryValidator {
             if (validateTypes && mf != null) {
                 List<ValidationFailure> typeValidationFailures = new ArrayList<ValidationFailure>();
                 boolean compatibleForType = isCompatibleForOperator(mc, mf, mf.getType(), op, val, typeValidationFailures);
-                List<ValidationFailure> subclassValidationFailures = new ArrayList<ValidationFailure>();
-                boolean compatibleForSubclass = isCompatibleForOperator(mc, mf, mf.getSubClass(), op, val, subclassValidationFailures);
+                List<ValidationFailure> subclassValidationFailures = new ArrayList<>();
+                boolean compatibleForSubclass = isCompatibleForOperator(mc, mf, mf.getSubClass(), op, val,
+                                                                        subclassValidationFailures);
 
                 if ((mf.isSingleValue() && !compatibleForType)
                     || mf.isMultipleValues() && !(compatibleForSubclass || compatibleForType)) {
 
-                    if (LOG.isWarningEnabled()) {
-                        LOG.warning(format("The type(s) for the query/update may be inconsistent; using an instance of type '%s' "
-                                           + "for the field '%s.%s' which is declared as '%s'", val.getClass().getName(),
-                                           mf.getDeclaringClass().getName(), mf.getJavaFieldName(), mf.getType().getName()
-                                          ));
-                        typeValidationFailures.addAll(subclassValidationFailures);
-                        LOG.warning("Validation warnings: \n" + typeValidationFailures);
-                    }
+                    LOG.warning(format(
+                            "The type(s) for the query/update may be inconsistent; using an instance of type '%s' "
+                            + "for the field '%s.%s' which is declared as '%s'", val.getClass().getName(),
+                            mf.getDeclaringClass().getName(), mf.getJavaFieldName(), mf.getType().getName()
+                    ));
+                    typeValidationFailures.addAll(subclassValidationFailures);
+                    LOG.warning("Validation warnings: \n" + typeValidationFailures);
                 }
             }
         }
@@ -134,32 +137,45 @@ final class QueryValidator {
     }
 
     /*package*/
-    static boolean isCompatibleForOperator(final MappedClass mappedClass, final MappedField mappedField, final Class<?> type,
+    static boolean isCompatibleForOperator(final MappedClass mappedClass, final MappedField mappedField,
+                                           final Optional<Class> type,
                                            final FilterOperator op,
                                            final Object value, final List<ValidationFailure> validationFailures) {
         // TODO: it's really OK to have null values?  I think this is to prevent null pointers further down,
         // but I want to move the null check into the operations that care whether they allow nulls or not.
-        if (value == null || type == null) {
+        if (!type.isPresent()) {
             return true;
         }
 
-        boolean validationApplied = ExistsOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || SizeOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || InOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || NotInOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || ModOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || GeoWithinOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || AllOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
-                                    || KeyValueTypeValidator.getInstance().apply(type, value, validationFailures)
-                                    || IntegerTypeValidator.getInstance().apply(type, value, validationFailures)
-                                    || LongTypeValidator.getInstance().apply(type, value, validationFailures)
-                                    || DoubleTypeValidator.getInstance().apply(type, value, validationFailures)
-                                    || PatternValueValidator.getInstance().apply(type, value, validationFailures)
-                                    || EntityAnnotatedValueValidator.getInstance().apply(type, value, validationFailures)
-                                    || ListValueValidator.getInstance().apply(type, value, validationFailures)
-                                    || EntityTypeAndIdValueValidator.getInstance()
-                                                                    .apply(mappedClass, mappedField, value, validationFailures)
-                                    || DefaultTypeValidator.getInstance().apply(type, value, validationFailures);
+        return isCompatibleForOperator(mappedClass, mappedField, type.get(), op, value, validationFailures);
+    }
+
+    /*package*/
+    static boolean isCompatibleForOperator(final MappedClass mappedClass, final MappedField mappedField,
+                                           final Class type,
+                                           final FilterOperator op,
+                                           final Object value, final List<ValidationFailure> validationFailures) {
+        if (value == null) {
+            return true;
+        }
+        boolean validationApplied =
+                ExistsOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || SizeOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || InOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || NotInOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || ModOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || GeoWithinOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || AllOperationValidator.getInstance().apply(mappedField, op, value, validationFailures)
+                || KeyValueTypeValidator.getInstance().apply(type, value, validationFailures)
+                || IntegerTypeValidator.getInstance().apply(type, value, validationFailures)
+                || LongTypeValidator.getInstance().apply(type, value, validationFailures)
+                || DoubleTypeValidator.getInstance().apply(type, value, validationFailures)
+                || PatternValueValidator.getInstance().apply(type, value, validationFailures)
+                || EntityAnnotatedValueValidator.getInstance().apply(type, value, validationFailures)
+                || ListValueValidator.getInstance().apply(type, value, validationFailures)
+                || EntityTypeAndIdValueValidator.getInstance()
+                                                .apply(mappedClass, mappedField, value, validationFailures)
+                || DefaultTypeValidator.getInstance().apply(type, value, validationFailures);
 
         return validationApplied && validationFailures.size() == 0;
     }

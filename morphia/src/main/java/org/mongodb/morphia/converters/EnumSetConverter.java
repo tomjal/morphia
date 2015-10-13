@@ -28,7 +28,7 @@ public class EnumSetConverter extends TypeConverter implements SimpleValueConver
             return null;
         }
 
-        final Class enumType = optionalExtraInfo.getSubClass();
+        final Class enumType = optionalExtraInfo.getSubClass().get();
 
         final List l = (List) fromDBObject;
         if (l.isEmpty()) {

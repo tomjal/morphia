@@ -9,7 +9,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+
+import static org.mongodb.morphia.utils.Factories.getOptionalBasedOnCondition;
 
 /**
  * This is a MappedField facade that allows us to convert and collect values to be gathered back in to a Map or Collection, e.g., rather
@@ -36,7 +39,7 @@ public class EphemeralMappedField extends MappedField {
         setIsMap(ReflectionUtils.implementsInterface(rawClass, Map.class));
         setMapKeyType(getMapKeyClass());
         setSubType(getSubType());
-        setIsMongoType(ReflectionUtils.isPropertyType(getSubClass()));
+        setIsMongoType(ReflectionUtils.isPropertyType(getSubClass().get()));
     }
 
     /**
@@ -70,8 +73,8 @@ public class EphemeralMappedField extends MappedField {
     }
 
     @Override
-    public Class getMapKeyClass() {
-        return (Class) (isMap() ? pType.getActualTypeArguments()[0] : null);
+    public Optional<Class> getMapKeyClass() {
+        return getOptionalBasedOnCondition(this::isMap, (Class)pType.getActualTypeArguments()[0]);
     }
 
     @Override
@@ -80,7 +83,7 @@ public class EphemeralMappedField extends MappedField {
     }
 
     @Override
-    public Class getSubClass() {
+    public Optional<Class> getSubClass() {
         return toClass(getSubType());
     }
 

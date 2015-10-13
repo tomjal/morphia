@@ -179,9 +179,9 @@ public class CustomConvertersTest extends TestBase {
      */
     @Entity(noClassnameStored = true)
     private static class MyEntity {
-
         @Id
         private Long id;
+
         @Embedded
         private ValueObject valueObject;
 
@@ -194,43 +194,32 @@ public class CustomConvertersTest extends TestBase {
         }
 
         @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + ((id == null) ? 0 : id.hashCode());
-            result = prime * result + ((valueObject == null) ? 0 : valueObject.hashCode());
-            return result;
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (this == obj) {
+        public boolean equals(Object o) {
+            if (this == o) {
                 return true;
             }
-            if (obj == null) {
+            if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            if (getClass() != obj.getClass()) {
+
+            MyEntity myEntity = (MyEntity) o;
+
+            if (id != null ? !id.equals(myEntity.id) : myEntity.id != null) {
                 return false;
             }
-            final MyEntity other = (MyEntity) obj;
-            if (id == null) {
-                if (other.id != null) {
-                    return false;
-                }
-            } else if (!id.equals(other.id)) {
+            if (valueObject != null ? !valueObject.equals(myEntity.valueObject) : myEntity.valueObject != null) {
                 return false;
             }
-            if (valueObject == null) {
-                if (other.valueObject != null) {
-                    return false;
-                }
-            } else if (!valueObject.equals(other.valueObject)) {
-                return false;
-            }
+
             return true;
         }
 
+        @Override
+        public int hashCode() {
+            int result = id != null ? id.hashCode() : 0;
+            result = 31 * result + (valueObject != null ? valueObject.hashCode() : 0);
+            return result;
+        }
     }
 
     @Embedded

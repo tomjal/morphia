@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import static java.lang.String.format;
 
@@ -29,18 +30,20 @@ public class IterableConverter extends TypeConverter {
             return fromDBObject;
         }
 
-        final Class subtypeDest = mf.getSubClass();
+        Optional<Class> subClass = mf.getSubClass();
         final Collection values = createNewCollection(mf);
 
         if (fromDBObject.getClass().isArray()) {
             //This should never happen. The driver always returns list/arrays as a List
             for (final Object o : (Object[]) fromDBObject) {
-                values.add(getMapper().getConverters().decode((subtypeDest != null) ? subtypeDest : o.getClass(), o, mf));
+                Class aClass = subClass.orElseGet(o::getClass);
+                values.add(getMapper().getConverters().decode(aClass, o, mf));
             }
         } else if (fromDBObject instanceof Iterable) {
             // map back to the java data type
             // (List/Set/Array[])
             for (final Object o : (Iterable) fromDBObject) {
+                Class subtypeDest = subClass.orElseGet(o::getClass);
                 if (o instanceof DBObject) {
                     final List<MappedField> typeParameters = mf.getTypeParameters();
                     if (!typeParameters.isEmpty()) {
@@ -51,20 +54,21 @@ public class IterableConverter extends TypeConverter {
                             values.add(field.getValue());
                         }
                     } else {
-                        values.add(getMapper().getConverters().decode((subtypeDest != null) ? subtypeDest : o.getClass(), o, mf));
+                        values.add(getMapper().getConverters().decode(subtypeDest, o, mf));
                     }
                 } else {
-                    values.add(getMapper().getConverters().decode((subtypeDest != null) ? subtypeDest : o.getClass(), o, mf));
+                    values.add(getMapper().getConverters().decode(subtypeDest, o, mf));
                 }
             }
         } else {
             //Single value case.
-            values.add(getMapper().getConverters().decode((subtypeDest != null) ? subtypeDest : fromDBObject.getClass(), fromDBObject, mf));
+            Class subtypeDest = subClass.orElseGet(fromDBObject::getClass);
+            values.add(getMapper().getConverters().decode(subtypeDest, fromDBObject, mf));
         }
 
         //convert to and array if that is the destination type (not a list/set)
         if (mf.getType().isArray()) {
-            return ReflectionUtils.convertToArray(subtypeDest, (List) values);
+            return ReflectionUtils.convertToArray(subClass.get(), (List) values);
         } else {
             return values;
         }
@@ -98,7 +102,7 @@ public class IterableConverter extends TypeConverter {
         final List values = new ArrayList();
         if (mf != null && mf.getSubClass() != null) {
             for (final Object o : iterableValues) {
-                values.add(getMapper().getConverters().encode(mf.getSubClass(), o));
+                values.add(getMapper().getConverters().encode(mf.getSubClass().get(), o));
             }
         } else {
             for (final Object o : iterableValues) {

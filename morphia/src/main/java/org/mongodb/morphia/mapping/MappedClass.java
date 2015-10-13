@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
@@ -139,16 +140,19 @@ public class MappedClass {
             return true;
         }
         if (clazz.isArray() || Map.class.isAssignableFrom(clazz) || Iterable.class.isAssignableFrom(clazz)) {
-            Class<?> subType;
+            Optional<Class> subType;
             if (clazz.isArray()) {
-                subType = clazz.getComponentType();
+                subType = Optional.ofNullable(clazz.getComponentType());
             } else {
                 subType = ReflectionUtils.getParameterizedClass(clazz);
             }
 
             //get component type, String.class from List<String>
-            if (subType != null && subType != Object.class && !ReflectionUtils.isPropertyType(subType)) {
-                return false;
+            if (subType.isPresent()) {
+                Class subtypeClass = subType.get();
+                if (subtypeClass != Object.class && !ReflectionUtils.isPropertyType(subtypeClass)) {
+                    return false;
+                }
             }
 
             //either no componentType or it is an allowed type
@@ -575,9 +579,7 @@ public class MappedClass {
         final Object o = mapper.getOptions().getObjectFactory().createInstance(clazz);
         final Object nullO = mapper.getInstanceCache().put(clazz, o);
         if (nullO != null) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Race-condition, created duplicate class: " + clazz);
-            }
+            LOG.error("Race-condition, created duplicate class: " + clazz);
         }
 
         return o;

@@ -138,39 +138,29 @@ public class TestMapper extends TestBase {
 
         @Override
         public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + ((id == null) ? 0 : id.hashCode());
-            result = prime * result + ((type == null) ? 0 : type.hashCode());
+            int result = id != null ? id.hashCode() : 0;
+            result = 31 * result + (type != null ? type.hashCode() : 0);
             return result;
         }
 
         @Override
-        public boolean equals(final Object obj) {
-            if (this == obj) {
+        public boolean equals(Object o) {
+            if (this == o) {
                 return true;
             }
-            if (obj == null) {
+            if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            if (!(obj instanceof CustomId)) {
+
+            CustomId customId = (CustomId) o;
+
+            if (id != null ? !id.equals(customId.id) : customId.id != null) {
                 return false;
             }
-            final CustomId other = (CustomId) obj;
-            if (id == null) {
-                if (other.id != null) {
-                    return false;
-                }
-            } else if (!id.equals(other.id)) {
+            if (type != null ? !type.equals(customId.type) : customId.type != null) {
                 return false;
             }
-            if (type == null) {
-                if (other.type != null) {
-                    return false;
-                }
-            } else if (!type.equals(other.type)) {
-                return false;
-            }
+
             return true;
         }
 

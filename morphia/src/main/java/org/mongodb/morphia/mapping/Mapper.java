@@ -52,6 +52,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -88,7 +89,7 @@ public class Mapper {
     /**
      * Set of classes that registered by this mapper
      */
-    private final Map<String, MappedClass> mappedClasses = new ConcurrentHashMap<String, MappedClass>();
+    private final Map<String, MappedClass> mappedClasses = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Set<MappedClass>> mappedClassesByCollection = new ConcurrentHashMap<String, Set<MappedClass>>();
 
     //EntityInterceptors; these are called before EntityListeners and lifecycle methods on an Entity, for all Entities
@@ -697,7 +698,7 @@ public class Mapper {
 
         Set<MappedClass> mcs = mappedClassesByCollection.get(mc.getCollectionName());
         if (mcs == null) {
-            mcs = new CopyOnWriteArraySet<MappedClass>();
+            mcs = new CopyOnWriteArraySet<>();
             final Set<MappedClass> temp = mappedClassesByCollection.putIfAbsent(mc.getCollectionName(), mcs);
             if (temp != null) {
                 mcs = temp;
@@ -738,7 +739,6 @@ public class Mapper {
         return mf != null
                && (mf.hasAnnotation(Reference.class) || Key.class.isAssignableFrom(mf.getType())
                    || DBRef.class.isAssignableFrom(mf.getType()) || isMultiValued(mf, value));
-
     }
 
     private boolean isEntity(final MappedClass mc) {
@@ -746,10 +746,16 @@ public class Mapper {
     }
 
     private boolean isMultiValued(final MappedField mf, final Object value) {
-        final Class subClass = mf.getSubClass();
         return value instanceof Iterable
                && mf.isMultipleValues()
-               && (Key.class.isAssignableFrom(subClass) || DBRef.class.isAssignableFrom(subClass));
+               && isAssignableFrom(Key.class, mf.getSubClass()) || isAssignableFrom(DBRef.class, mf.getSubClass());
+    }
+
+    private boolean isAssignableFrom(Class<?> aClass, Optional<Class> anotherClass) {
+        if (anotherClass.isPresent()) {
+            return (aClass.isAssignableFrom(anotherClass.get()));
+        }
+        return false;
     }
 
     private void readMappedField(final DBObject dbObject, final MappedField mf, final Object entity, final EntityCache cache) {
@@ -836,7 +842,7 @@ public class Mapper {
                 isSingleValue = false;
                 isMap = implementsInterface(type, Map.class);
                 // subtype of Long[], List<Long> is Long
-                subType = (type.isArray()) ? type.getComponentType() : getParameterizedClass(type, (isMap) ? 1 : 0);
+                subType = (type.isArray()) ? type.getComponentType() : getParameterizedClass(type, (isMap) ? 1 : 0).get();
             }
 
             if (isSingleValue && !isPropertyType(type)) {

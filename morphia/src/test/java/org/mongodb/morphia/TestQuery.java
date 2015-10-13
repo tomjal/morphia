@@ -1000,7 +1000,7 @@ public class TestQuery extends TestBase {
         }
 
         public PhotoWithKeywords(final String... words) {
-            keywords = new ArrayList<Keyword>(words.length);
+            keywords = new ArrayList<>(words.length);
             for (final String word : words) {
                 keywords.add(new Keyword(word));
             }

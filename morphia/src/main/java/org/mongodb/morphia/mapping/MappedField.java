@@ -3,6 +3,7 @@ package org.mongodb.morphia.mapping;
 
 import com.mongodb.DBObject;
 import com.mongodb.DBRef;
+import org.jetbrains.annotations.NotNull;
 import org.mongodb.morphia.Key;
 import org.mongodb.morphia.annotations.AlsoLoad;
 import org.mongodb.morphia.annotations.ConstructorArgs;
@@ -34,6 +35,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.lang.String.format;
@@ -70,10 +72,11 @@ public class MappedField {
     private final List<MappedField> typeParameters = new ArrayList<>();
     private Class persistedClass;
     private Field field; // the field :)
+    @NotNull
     private Class realType; // the real type
     private Constructor constructor; // the constructor for the type
-    private Type subType; // the type (T) for the Collection<T>/T[]/Map<?,T>
-    private Type mapKeyType; // the type (T) for the Map<T,?>
+    private Optional<? extends Type> subType = Optional.empty(); // the type (T) for the Collection<T>/T[]/Map<?,T>
+    private Optional<? extends Type> mapKeyType; // the type (T) for the Map<T,?>
     private boolean isSingleValue = true; // indicates the field is a single value
     private boolean isMongoType;
     // indicated the type is a mongo compatible type (our version of value-type)
@@ -278,7 +281,7 @@ public class MappedField {
      *
      * @return the type of the map key
      */
-    public Class getMapKeyClass() {
+    public Optional<Class> getMapKeyClass() {
         return toClass(mapKeyType);
     }
 
@@ -301,7 +304,7 @@ public class MappedField {
      *
      * @return the parameterized type of the field
      */
-    public Class getSubClass() {
+    public Optional<Class> getSubClass() {
         return toClass(subType);
     }
 
@@ -311,11 +314,11 @@ public class MappedField {
      * @return the parameterized type of the field
      */
     public Type getSubType() {
-        return subType;
+        return subType.get();
     }
 
     void setSubType(final Type subType) {
-        this.subType = subType;
+        this.subType = Optional.ofNullable(subType);
     }
 
     /**
@@ -437,7 +440,7 @@ public class MappedField {
         if (isMap()) {
             sb.append(" map:true,");
             if (getMapKeyClass() != null) {
-                sb.append(" map-key:").append(getMapKeyClass().getSimpleName());
+                sb.append(" map-key:").append(getMapKeyClass().get().getSimpleName());
             } else {
                 sb.append(" map-key: class unknown! ");
             }
@@ -478,11 +481,12 @@ public class MappedField {
 
         // if the main type isn't supported by the Mongo, see if the subtype is.
         // works for T[], List<T>, Map<?, T>, where T is Long/String/etc.
-        if (!isMongoType && subType != null) {
-            isMongoType = ReflectionUtils.isPropertyType(subType);
+        if (!isMongoType && subType.isPresent()) {
+            isMongoType = ReflectionUtils.isPropertyType(subType.get());
         }
 
-        if (!isMongoType && !isSingleValue && (subType == null || subType == Object.class)) {
+        if (!isMongoType && !isSingleValue && ((subType.isPresent() && subType.get() == Object.class)
+                                               || !subType.isPresent())) {
             if (LOG.isWarningEnabled() && !mapper.getConverters().hasDbObjectConverter(this)) {
                 LOG.warning(format("The multi-valued field '%s' is a possible heterogeneous collection. It cannot be verified. "
                                    + "Please declare a valid type to get rid of this warning. %s", getFullName(), subType));
@@ -498,7 +502,7 @@ public class MappedField {
         } else if (genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
             final Type[] types = pt.getActualTypeArguments();
-            realType = toClass(pt);
+            realType = toClass(pt).get();
 
             for (Type type : types) {
                 if (type instanceof ParameterizedType) {
@@ -513,14 +517,14 @@ public class MappedField {
         } else if (genericType instanceof WildcardType) {
             final WildcardType wildcardType = (WildcardType) genericType;
             final Type[] types = wildcardType.getUpperBounds();
-            realType = toClass(types[0]);
+            realType = toClass(types[0]).get();
         } else if (genericType instanceof Class) {
             realType = (Class) genericType;
         } else if (genericType instanceof GenericArrayType) {
             final Type genericComponentType = ((GenericArrayType) genericType).getGenericComponentType();
             if (genericComponentType instanceof ParameterizedType) {
                 ParameterizedType pt = (ParameterizedType) genericComponentType;
-                realType = toClass(genericType);
+                realType = toClass(genericType).get();
 
                 final Type[] types = pt.getActualTypeArguments();
                 for (Type type : types) {
@@ -535,7 +539,7 @@ public class MappedField {
                 }
             } else {
                 if (genericComponentType instanceof TypeVariable) {
-                    realType = toClass(genericType);
+                    realType = toClass(genericType).get();
                 } else {
                     realType = (Class) genericComponentType;
                 }
@@ -595,11 +599,16 @@ public class MappedField {
         return field.getName();
     }
 
-    protected Class toClass(final Type t) {
-        if (t == null) {
-            return null;
-        } else if (t instanceof Class) {
-            return (Class) t;
+    protected Optional<Class> toClass(final Optional<? extends Type> theType) {
+        if (!theType.isPresent()) {
+            return Optional.empty();
+        }
+        return toClass(theType.get());
+    }
+
+    protected Optional<Class> toClass(final Type t) {
+        if (t instanceof Class) {
+            return Optional.of((Class) t);
         } else if (t instanceof GenericArrayType) {
             final Type type = ((GenericArrayType) t).getGenericComponentType();
             Class aClass;
@@ -613,15 +622,13 @@ public class MappedField {
             } else {
                 aClass = (Class) type;
             }
-            return Array.newInstance(aClass, 0).getClass();
+            return Optional.of(Array.newInstance(aClass, 0).getClass());
         } else if (t instanceof ParameterizedType) {
-            return (Class) ((ParameterizedType) t).getRawType();
+            return Optional.ofNullable((Class) ((ParameterizedType) t).getRawType());
         } else if (t instanceof WildcardType) {
-            return (Class) ((WildcardType) t).getUpperBounds()[0];
+            return Optional.of((Class) ((WildcardType) t).getUpperBounds()[0]);
         }
-
         throw new RuntimeException("Generic TypeVariable not supported!");
-
     }
 
     private Constructor discoverConstructor() {
@@ -704,7 +711,9 @@ public class MappedField {
             }
 
             // get the subtype T, T[]/List<T>/Map<?,T>; subtype of Long[], List<Long> is Long
-            subType = (realType.isArray()) ? realType.getComponentType() : ReflectionUtils.getParameterizedType(field, isMap ? 1 : 0);
+            subType = (realType.isArray()) ?
+                    Optional.ofNullable(realType.getComponentType())
+                    : ReflectionUtils.getParameterizedType(field, isMap ? 1 : 0);
 
             if (isMap) {
                 mapKeyType = ReflectionUtils.getParameterizedType(field, 0);
@@ -724,7 +733,7 @@ public class MappedField {
         this.isSet = isSet;
     }
 
-    void setMapKeyType(final Class mapKeyType) {
+    void setMapKeyType(final Optional<Class> mapKeyType) {
         this.mapKeyType = mapKeyType;
     }
 }

@@ -13,6 +13,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.lang.String.format;
@@ -85,6 +86,11 @@ public abstract class Converters {
         return getEncoder(toDecode).decode(toDecode, fromDBObject, mf);
     }
 
+    public Object decode(final Optional<Class> c, final Object fromDBObject, final MappedField mf) {
+        Class toDecode = c.orElseGet(fromDBObject::getClass);
+        return getEncoder(toDecode).decode(toDecode, fromDBObject, mf);
+    }
+
     /**
      * encode the type safe java object into the corresponding {@link com.mongodb.DBObject}
      *
@@ -137,7 +143,8 @@ public abstract class Converters {
      */
     public boolean hasDbObjectConverter(final MappedField field) {
         final TypeConverter converter = getEncoder(field);
-        return converter != null && !(converter instanceof IdentityConverter) && !(converter instanceof SimpleValueConverter);
+        return converter != null && !(converter instanceof IdentityConverter)
+               && !(converter instanceof SimpleValueConverter);
     }
 
     /**
@@ -146,7 +153,8 @@ public abstract class Converters {
      */
     public boolean hasDbObjectConverter(final Class c) {
         final TypeConverter converter = getEncoder(c);
-        return converter != null && !(converter instanceof IdentityConverter) && !(converter instanceof SimpleValueConverter);
+        return converter != null && !(converter instanceof IdentityConverter)
+               && !(converter instanceof SimpleValueConverter);
     }
 
     /**
@@ -165,6 +173,13 @@ public abstract class Converters {
         } else {
             return hasSimpleValueConverter(o.getClass());
         }
+    }
+
+    public boolean hasSimpleValueConverter(final Optional<Class> optional) {
+        if (!optional.isPresent()) {
+            return false;
+        }
+        return hasSimpleValueConverter(optional.get());
     }
 
     /**

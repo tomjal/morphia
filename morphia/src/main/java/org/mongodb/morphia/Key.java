@@ -1,6 +1,8 @@
 package org.mongodb.morphia;
 
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.Serializable;
 import java.util.Arrays;
 
@@ -72,7 +74,7 @@ public class Key<T> implements Serializable, Comparable<Key<T>> {
     }
 
     @Override
-    public int compareTo(final Key<T> other) {
+    public int compareTo(@NotNull final Key<T> other) {
         checkState(this);
         checkState(other);
 

@@ -1,5 +1,6 @@
 package org.mongodb.morphia.mapping.validation;
 
+import org.jetbrains.annotations.NotNull;
 import org.mongodb.morphia.ObjectFactory;
 import org.mongodb.morphia.annotations.Embedded;
 import org.mongodb.morphia.annotations.Property;
@@ -138,7 +139,7 @@ public class MappingValidator {
         }
 
         @Override
-        public int compareTo(final LogLine o) {
+        public int compareTo(@NotNull final LogLine o) {
             return v.getPrefix().compareTo(o.v.getPrefix());
         }
 

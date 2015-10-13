@@ -13,13 +13,16 @@ import java.io.Serializable;
 import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.hamcrest.CoreMatchers.isA;
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.mongodb.morphia.testutil.ExactClassMatcher.exactClass;
 
@@ -32,9 +35,23 @@ public class ReflectionUtilsTest extends TestBase {
 
     @Test
     public void shouldAcceptMapWithoutItsOwnGenericParameters() {
-        Class parameterizedClass = ReflectionUtils.getParameterizedClass(MapWithoutGenericTypes.class);
+        Optional<Class> parameterizedClass = ReflectionUtils.getParameterizedClass(MapWithoutGenericTypes.class);
 
-        assertThat(parameterizedClass, is(exactClass(Integer.class)));
+        assertThat(parameterizedClass.get(), is(exactClass(Integer.class)));
+    }
+
+    @Test
+    public void shouldReturnEmptyForEnumSetsAsThisIsNotSupported() {
+        EnumSet<MyEnum> enumSet = EnumSet.allOf(MyEnum.class);
+        Optional<Class> actual = ReflectionUtils.getParameterizedClass(enumSet.getClass());
+        assertFalse(actual.isPresent());
+    }
+
+    @Test
+    public void shouldReturnEmptyForTypeWithNoParams() {
+        Optional<Class> actual = ReflectionUtils.getParameterizedClass(Integer.class);
+
+        assertFalse(actual.isPresent());
     }
 
     @Test
@@ -69,15 +86,15 @@ public class ReflectionUtilsTest extends TestBase {
     @Test
     public void testGetParameterizedClassInheritance() throws Exception {
         // Work before fix...
-        assertThat(ReflectionUtils.getParameterizedClass(Set.class), isA(Object.class));
-        assertThat(ReflectionUtils.getParameterizedClass(Book.class.getDeclaredField("authorsSet")), is(exactClass(Author.class)));
+        assertThat(ReflectionUtils.getParameterizedClass(Set.class).get(), isA(Object.class));
+        assertThat(ReflectionUtils.getParameterizedClass(Book.class.getDeclaredField("authorsSet")).get(), is(exactClass(Author.class)));
 
         // Works now...
-        assertThat(ReflectionUtils.getParameterizedClass(Book.class.getDeclaredField("authors")), is(exactClass(Author.class)));
+        assertThat(ReflectionUtils.getParameterizedClass(Book.class.getDeclaredField("authors")).get(), is(exactClass(Author.class)));
 
-        assertThat(ReflectionUtils.getParameterizedClass(Authors.class), is(exactClass(Author.class)));
+        assertThat(ReflectionUtils.getParameterizedClass(Authors.class).get(), is(exactClass(Author.class)));
 
-        assertThat(ReflectionUtils.getParameterizedClass(WritingTeam.class), is(is(exactClass(Author.class))));
+        assertThat(ReflectionUtils.getParameterizedClass(WritingTeam.class).get(), is(exactClass(Author.class)));
     }
 
     /**
@@ -162,4 +179,9 @@ public class ReflectionUtilsTest extends TestBase {
 
     private static class Sub extends Super3<Integer> {
     }
+
+    private static enum MyEnum {
+        Value1
+    }
+
 }

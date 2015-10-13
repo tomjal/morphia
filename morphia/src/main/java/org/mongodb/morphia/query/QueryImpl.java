@@ -10,6 +10,7 @@ import com.mongodb.DBObject;
 import com.mongodb.ReadPreference;
 import org.bson.BSONObject;
 import org.bson.types.CodeWScope;
+import org.jetbrains.annotations.NotNull;
 import org.mongodb.morphia.Datastore;
 import org.mongodb.morphia.DatastoreImpl;
 import org.mongodb.morphia.Key;
@@ -27,11 +28,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 import static org.mongodb.morphia.query.QueryValidator.validateQuery;
+import static org.mongodb.morphia.utils.Factories.getOptionalBasedOnCondition;
 
 
 /**
@@ -63,7 +66,7 @@ public class QueryImpl<T> extends CriteriaContainerImpl implements Query<T> {
     private boolean noTimeout;
     private boolean tail;
     private boolean tailAwaitData;
-    private ReadPreference readPref;
+    private Optional<ReadPreference> readPref = Optional.empty();
     private Integer maxScan;
     private Long maxTime;
     private TimeUnit maxTimeUnit;
@@ -89,9 +92,9 @@ public class QueryImpl<T> extends CriteriaContainerImpl implements Query<T> {
         final MappedClass mc = this.ds.getMapper().getMappedClass(clazz);
         final Entity entAn = mc == null ? null : mc.getEntityAnnotation();
         if (entAn != null) {
-            readPref = this.ds.getMapper().getMappedClass(clazz).getEntityAnnotation().queryNonPrimary()
-                       ? ReadPreference.secondaryPreferred()
-                       : null;
+            readPref = getOptionalBasedOnCondition(() -> this.ds.getMapper().getMappedClass(clazz)
+                                                                .getEntityAnnotation().queryNonPrimary(),
+                                                   ReadPreference.secondaryPreferred());
         }
     }
 
@@ -479,14 +482,14 @@ public class QueryImpl<T> extends CriteriaContainerImpl implements Query<T> {
     @Override
     @SuppressWarnings("deprecation")
     public Query<T> queryNonPrimary() {
-        readPref = ReadPreference.secondary();
+        readPref = Optional.of(ReadPreference.secondary());
         return this;
     }
 
     @Override
     @SuppressWarnings("deprecation")
     public Query<T> queryPrimaryOnly() {
-        readPref = ReadPreference.primary();
+        readPref = Optional.of(ReadPreference.primary());
         return this;
     }
 
@@ -549,8 +552,8 @@ public class QueryImpl<T> extends CriteriaContainerImpl implements Query<T> {
     }
 
     @Override
-    public Query<T> useReadPreference(final ReadPreference readPref) {
-        this.readPref = readPref;
+    public Query<T> useReadPreference(@NotNull final ReadPreference readPref) {
+        this.readPref = Optional.of(readPref);
         return this;
     }
 
@@ -637,9 +640,7 @@ public class QueryImpl<T> extends CriteriaContainerImpl implements Query<T> {
             cursor.hint(indexHint);
         }
 
-        if (null != readPref) {
-            cursor.setReadPreference(readPref);
-        }
+        readPref.ifPresent(cursor::setReadPreference);
 
         if (noTimeout) {
             cursor.addOption(Bytes.QUERYOPTION_NOTIMEOUT);

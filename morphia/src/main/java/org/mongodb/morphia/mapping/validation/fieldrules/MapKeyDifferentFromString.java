@@ -6,10 +6,13 @@ import org.mongodb.morphia.annotations.Serialized;
 import org.mongodb.morphia.mapping.MappedClass;
 import org.mongodb.morphia.mapping.MappedField;
 import org.mongodb.morphia.mapping.validation.ConstraintViolation;
-import org.mongodb.morphia.mapping.validation.ConstraintViolation.Level;
 import org.mongodb.morphia.utils.ReflectionUtils;
 
+import java.util.Optional;
 import java.util.Set;
+
+import static org.mongodb.morphia.mapping.validation.ConstraintViolation.Level.FATAL;
+import static org.mongodb.morphia.mapping.validation.ConstraintViolation.Level.WARNING;
 
 
 /**
@@ -21,17 +24,23 @@ public class MapKeyDifferentFromString extends FieldConstraint {
     @Override
     protected void check(final MappedClass mc, final MappedField mf, final Set<ConstraintViolation> ve) {
         if (mf.isMap() && (!mf.hasAnnotation(Serialized.class))) {
-            final Class<?> aClass = ReflectionUtils.getParameterizedClass(mf.getField(), 0);
+            final Optional<Class> aClass = ReflectionUtils.getParameterizedClass(mf.getField(), 0);
             // WARN if not parameterized : null or Object...
-            if (aClass == null || Object.class.equals(aClass)) {
-                ve.add(new ConstraintViolation(Level.WARNING, mc, mf, getClass(),
-                                               "Maps cannot be keyed by Object (Map<Object,?>); Use a parametrized type that is supported "
-                                               + SUPPORTED));
-            } else if (!aClass.equals(String.class) && !aClass.equals(ObjectId.class) && !ReflectionUtils.isPrimitiveLike(
-                                                                                                                             aClass)) {
-                ve.add(new ConstraintViolation(Level.FATAL, mc, mf, getClass(),
-                                               "Maps must be keyed by a simple type " + SUPPORTED + "; " + aClass
-                                               + " is not supported as a map key type."));
+            if (!aClass.isPresent()) {
+                ve.add(new ConstraintViolation(WARNING, mc, mf, getClass(), "Map is not parameterized" + SUPPORTED));
+            } else {
+                Class classType = aClass.get();
+                if (Object.class.equals(classType)) {
+                    ve.add(new ConstraintViolation(WARNING, mc, mf, getClass(),
+                                                   "Maps cannot be keyed by Object (Map<Object,?>); Use a parametrized type that is supported "
+                                                   + SUPPORTED));
+                } else if (!classType.equals(String.class)
+                           && !classType.equals(ObjectId.class)
+                           && !ReflectionUtils.isPrimitiveLike(classType)) {
+                    ve.add(new ConstraintViolation(FATAL, mc, mf, getClass(),
+                                                   "Maps must be keyed by a simple type " + SUPPORTED + "; " + classType
+                                                   + " is not supported as a map key type."));
+                }
             }
         }
     }

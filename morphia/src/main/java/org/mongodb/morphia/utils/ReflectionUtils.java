@@ -51,11 +51,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.regex.Pattern;
+
+import static org.mongodb.morphia.utils.Factories.getOptionalBasedOnCondition;
 
 
 /**
@@ -178,7 +181,7 @@ public final class ReflectionUtils {
      * @param field the field
      * @return the class that parameterizes the field, or null if field is not parameterized
      */
-    public static Class getParameterizedClass(final Field field) {
+    public static Optional<Class> getParameterizedClass(final Field field) {
         return getParameterizedClass(field, 0);
     }
 
@@ -187,23 +190,22 @@ public final class ReflectionUtils {
      *
      * @param field the field
      * @param index the index of the parameterizing class
-     * @return the class that parameterizes the field, or null if field is not parameterized
+     * @return an Optional (i.e. nullable) containing the class that parameterizes the field if it's not null
      */
-    public static Class getParameterizedClass(final Field field, final int index) {
+    public static Optional<Class> getParameterizedClass(final Field field, final int index) {
         if (field.getGenericType() instanceof ParameterizedType) {
             final ParameterizedType type = (ParameterizedType) field.getGenericType();
             if ((type.getActualTypeArguments() != null) && (type.getActualTypeArguments().length <= index)) {
-                return null;
+                return Optional.empty();
             }
             final Type paramType = type.getActualTypeArguments()[index];
             if (paramType instanceof GenericArrayType) {
                 final Class arrayType = (Class) ((GenericArrayType) paramType).getGenericComponentType();
-                return Array.newInstance(arrayType, 0)
-                            .getClass();
+                return Optional.of(Array.newInstance(arrayType, 0).getClass());
             } else {
                 if (paramType instanceof ParameterizedType) {
                     final ParameterizedType paramPType = (ParameterizedType) paramType;
-                    return (Class) paramPType.getRawType();
+                    return Optional.of((Class) paramPType.getRawType());
                 } else {
                     if (paramType instanceof TypeVariable) {
                         // TODO: Figure out what to do... Walk back up the to
@@ -212,7 +214,7 @@ public final class ReflectionUtils {
                         throw new MappingException("Generic Typed Class not supported:  <" + ((TypeVariable) paramType).getName() + "> = "
                                                    + ((TypeVariable) paramType).getBounds()[0]);
                     } else if (paramType instanceof Class) {
-                        return (Class) paramType;
+                        return Optional.of((Class) paramType);
                     } else {
                         throw new MappingException("Unknown type... pretty bad... call for help, wave your hands... yeah!");
                     }
@@ -229,31 +231,24 @@ public final class ReflectionUtils {
      * @param index the location of the parameter to return
      * @return the type
      */
-    public static Type getParameterizedType(final Field field, final int index) {
+    public static Optional<? extends Type> getParameterizedType(final Field field, final int index) {
         if (field != null) {
             if (field.getGenericType() instanceof ParameterizedType) {
                 final ParameterizedType type = (ParameterizedType) field.getGenericType();
                 if ((type.getActualTypeArguments() != null) && (type.getActualTypeArguments().length <= index)) {
-                    return null;
+                    return Optional.empty();
                 }
                 final Type paramType = type.getActualTypeArguments()[index];
                 if (paramType instanceof GenericArrayType) {
-                    return paramType; //((GenericArrayType) paramType).getGenericComponentType();
+                    return Optional.of(paramType); //((GenericArrayType) paramType).getGenericComponentType();
                 } else {
                     if (paramType instanceof ParameterizedType) {
-                        return paramType;
+                        return Optional.of(paramType);
                     } else {
-                        if (paramType instanceof TypeVariable) {
-                            // TODO: Figure out what to do... Walk back up the to
-                            // the parent class and try to get the variable type
-                            // from the T/V/X
-                            // throw new MappingException("Generic Typed Class not supported:  <" + ((TypeVariable)
-                            // paramType).getName() + "> = " + ((TypeVariable) paramType).getBounds()[0]);
-                            return paramType;
-                        } else if (paramType instanceof WildcardType) {
-                            return paramType;
-                        } else if (paramType instanceof Class) {
-                            return paramType;
+                        if (paramType instanceof TypeVariable
+                            || paramType instanceof WildcardType
+                            || paramType instanceof Class) {
+                            return Optional.of(paramType);
                         } else {
                             throw new MappingException("Unknown type... pretty bad... call for help, wave your hands... yeah!");
                         }
@@ -265,7 +260,7 @@ public final class ReflectionUtils {
             return getParameterizedClass(field.getType());
         }
 
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -274,7 +269,7 @@ public final class ReflectionUtils {
      * @param c the class to examine
      * @return the type
      */
-    public static Class getParameterizedClass(final Class c) {
+    public static Optional<Class> getParameterizedClass(final Class c) {
         return getParameterizedClass(c, 0);
     }
 
@@ -283,9 +278,9 @@ public final class ReflectionUtils {
      *
      * @param c     the class to examine
      * @param index the position of the type to return
-     * @return the type
+     * @return the type or null if there's no parameterised type
      */
-    public static Class getParameterizedClass(final Class c, final int index) {
+    public static Optional<Class> getParameterizedClass(final Class c, final int index) {
         final TypeVariable[] typeVars = c.getTypeParameters();
         if (typeVars.length > 0) {
             final TypeVariable typeVariable = typeVars[index];
@@ -293,10 +288,10 @@ public final class ReflectionUtils {
 
             final Type type = bounds[0];
             if (type instanceof Class) {
-                return (Class) type; // broke for EnumSet, cause bounds contain
+                return Optional.of((Class) type); // broke for EnumSet, cause bounds contain
                 // type instead of class
             } else {
-                return null;
+                return Optional.empty();
             }
         } else {
             Type superclass = c.getGenericSuperclass();
@@ -308,11 +303,12 @@ public final class ReflectionUtils {
             }
             if (superclass instanceof ParameterizedType) {
                 final Type[] actualTypeArguments = ((ParameterizedType) superclass).getActualTypeArguments();
-                return actualTypeArguments.length > index ? (Class<?>) actualTypeArguments[index] : null;
+                return getOptionalBasedOnCondition(() -> actualTypeArguments.length > index,
+                                                   (Class<?>) actualTypeArguments[index]);
             } else if (!Object.class.equals(superclass)) {
                 return getParameterizedClass((Class) superclass);
             } else {
-                return null;
+                return Optional.empty();
             }
         }
     }

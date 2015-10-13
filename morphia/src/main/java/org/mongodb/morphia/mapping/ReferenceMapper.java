@@ -113,7 +113,7 @@ class ReferenceMapper implements CustomMapper {
     private void readCollection(final DBObject dbObject, final MappedField mf, final Object entity, final Reference refAnn,
                                 final EntityCache cache, final Mapper mapper) {
         // multiple references in a List
-        final Class referenceObjClass = mf.getSubClass();
+        final Class referenceObjClass = mf.getSubClass().get();
         // load reference class.  this "fixes" #816
         mapper.getMappedClass(referenceObjClass);
         Collection references = mf.isSet() ? mapper.getOptions().getObjectFactory().createSet(mf)
@@ -153,7 +153,8 @@ class ReferenceMapper implements CustomMapper {
         }
 
         if (mf.getType().isArray()) {
-            mf.setFieldValue(entity, ReflectionUtils.convertToArray(mf.getSubClass(), ReflectionUtils.iterToList(references)));
+            mf.setFieldValue(entity, ReflectionUtils.convertToArray(mf.getSubClass().get(), ReflectionUtils.iterToList
+                    (references)));
         } else {
             mf.setFieldValue(entity, references);
         }
@@ -162,7 +163,7 @@ class ReferenceMapper implements CustomMapper {
     private void readMap(final DBObject dbObject, final MappedField mf, final Object entity, final Reference refAnn,
                          final EntityCache cache,
                          final Mapper mapper) {
-        final Class referenceObjClass = mf.getSubClass();
+        final Class referenceObjClass = mf.getSubClass().get();
         Map m = mapper.getOptions().getObjectFactory().createMap(mf);
 
         final DBObject dbVal = (DBObject) mf.getDbObjectValue(dbObject);
@@ -300,7 +301,7 @@ class ReferenceMapper implements CustomMapper {
         }
 
         final DBRef dbRef = idOnly ? null : (DBRef) ref;
-        final Key key = mapper.createKey(mf.isSingleValue() ? mf.getType() : mf.getSubClass(),
+        final Key key = mapper.createKey(mf.isSingleValue() ? mf.getType() : mf.getSubClass().get(),
                                          idOnly ? ref : dbRef.getId());
 
         final Object cached = cache.getEntity(key);

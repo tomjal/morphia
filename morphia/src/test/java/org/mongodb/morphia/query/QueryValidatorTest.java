@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -232,7 +233,8 @@ public class QueryValidatorTest {
     public void shouldBeCompatibleIfTypeIsNull() {
         // expect
         // frankly not sure we should just let nulls through
-        assertThat(QueryValidator.isCompatibleForOperator(null, null, null, EQUAL, "value", new ArrayList<ValidationFailure>()), is(true));
+        assertThat(QueryValidator.isCompatibleForOperator(null, null, Optional.empty(), EQUAL, "value", new
+                ArrayList<>()), is(true));
     }
 
     @Test
